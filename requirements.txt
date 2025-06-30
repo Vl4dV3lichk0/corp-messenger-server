@@ -1,0 +1,11 @@
+bcrypt
+dotenv
+fastapi
+uvicorn[standard]
+sqlalchemy
+databases[aiosqlite]
+websockets
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+pydantic
