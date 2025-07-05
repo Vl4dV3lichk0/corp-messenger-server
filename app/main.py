@@ -1,13 +1,18 @@
 import logging
+from email.policy import default
+
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, schemas, security
 from app.database import SessionLocal
 from datetime import datetime
 from app.schemas import UserCreate, UserLogin, Token, UserResponse
+from fastapi.security import OAuth2PasswordBearer
 
 logger = logging.getLogger(__name__)
 app = FastAPI()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def get_db():
     db = SessionLocal()
@@ -15,6 +20,24 @@ def get_db():
         yield db
     finally:
         db.close()
+
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    # Декорируем токен
+    payload = security.decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Неверные учетные данные")
+
+    # Извлекаем username из токена
+    username = payload.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="Неверные учетные данные")
+
+    # Ищем пользователя в базе данных
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+    return user
 
 @app.post("/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -50,23 +73,21 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(401, detail='Неверное имя пользователя или пароль!')
 
     # Вызов исключения также в случае неверного ввода пароля
-    elif not security.verify_password(user.password, db_user.hashed_password):
+    if not security.verify_password(user.password, db_user.hashed_password):
         raise HTTPException(401, detail='Неверное имя пользователя или пароль!')
 
     # Создаем токен
-    else:
-        try:
-            access_token = security.create_access_token(data={"sub": db_user.username})
-            # Возвращаем токен
-            return Token(
-                access_token=access_token,
-                token_type='bearer')
-        except ValueError as e:
-            raise HTTPException(status_code=500, detail="Ошибка сервера при создании токена")
+    try:
+        access_token = security.create_access_token(data={"sub": db_user.username})
+        # Возвращаем токен
+        return Token(
+            access_token=access_token,
+            token_type='bearer')
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail="Ошибка сервера при создании токена")
 
-'''
-@app.post("/users/me")
-#async def register(user: UserCreate, db: Session = Depends(get_db)):
-    #pass
-# Ваша реализация здесь'''
+@app.get("/users/me", response_model=UserResponse)
+async def read_users_me(current_user: models.User = Depends(get_current_user)):
+    return current_user
+
 
