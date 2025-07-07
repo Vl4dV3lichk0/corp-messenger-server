@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
+
 
 class User(Base):
     __tablename__ = "users"
@@ -10,6 +12,13 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_online = Column(Boolean, default=False)
     last_seen = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Обратная связь для контактов
+    contacts = relationship(
+        "Contact",
+        foreign_keys="Contact.user_id",
+        back_populates="user"
+    )
 
 class Message(Base):
     __tablename__ = "messages"
@@ -28,3 +37,16 @@ class Chat(Base):
     name = Column(String, index=True)
     is_group = Column(Boolean, default=False)
     # Связи будут реализованы через ассоциативную таблицу
+
+
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    contact_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id], back_populates="contacts")
+    contact = relationship("User", foreign_keys=[contact_id])

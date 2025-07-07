@@ -1,3 +1,4 @@
+import json
 import logging
 from email.policy import default
 from idlelib.query import Query
@@ -6,11 +7,13 @@ from fastapi import FastAPI, Depends, HTTPException, Query, WebSocketDisconnect
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from app import models, schemas, security
+from app import models, schemas, security, crud
 from app.database import SessionLocal
 from datetime import datetime
 from app.schemas import UserCreate, UserLogin, Token, UserResponse
 from fastapi.security import OAuth2PasswordBearer
+
+from typing import List
 
 from app import connection_manager
 
@@ -111,14 +114,76 @@ async def websocket_endpoint(
         await websocket.close(code=1008)
         return
 
-    manager = connection_manager.ConnectionManager()
+    manager = connection_manager.ConnectionManager(db)
     await manager.connect(websocket, user_id)
 
     try:
         while True:
             data = await websocket.receive_text()
             # обработка сообщения
-            await websocket.send_text(f"Echo: {data}")
+            message = json.loads(data)
+
+            # Определение типа сообщения
+            if message["type"] == "private":
+                await manager.send_to_user(
+                    json.dumps(message),
+                    message["receiver"])
+
+            # При получении сообщения
+            new_message = models.Message(
+                sender_id=message["sender"],
+                receiver_id=message["receiver"],
+                text=message["text"],
+                timestamp=datetime.utcnow()
+            )
+            db.add(new_message)
+            db.commit()
+
     except WebSocketDisconnect:
         await manager.disconnect(websocket)
+    except json.JSONDecodeError:
+        await websocket.send_text("Ошибка: Неверный формат сообщения")
 
+@app.post("/contacts", response_model=schemas.ContactResponse)
+async def add_contact(
+        contact: schemas.ContactCreate,
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+    # Проверяем, существует ли контакт
+    db_contact_user = db.query(models.User).filter(models.User.id == contact.contact_id).first()
+    if not db_contact_user:
+        raise HTTPException(404, "Пользователь не найден")
+
+    # Проверяем, не добавлен ли уже контакт
+    existing_contact = db.query(models.Contact).filter(
+        models.Contact.user_id == current_user.id,
+        models.Contact.contact_id == contact.contact_id
+    ).first()
+
+    if existing_contact:
+        raise HTTPException(400, "Контакт уже добавлен")
+
+    # Создаем новую запись контакта
+    new_contact = models.Contact(
+        user_id=current_user.id,
+        contact_id=contact.contact_id
+    )
+
+    db.add(new_contact)
+    db.commit()
+    db.refresh(new_contact)
+
+    return {
+        "id": new_contact.id,
+        "contact_id": new_contact.contact_id,
+        "username": db_contact_user.username
+    }
+
+
+@app.get("/contacts", response_model=List[schemas.ContactResponse])
+async def get_contacts(
+        db: Session = Depends(get_db),
+        current_user: models.User = Depends(get_current_user)
+):
+    return crud.get_user_contacts(db, current_user.id)

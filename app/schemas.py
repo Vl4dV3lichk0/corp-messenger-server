@@ -39,3 +39,14 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ContactCreate(BaseModel):
+    contact_id: int
+
+class ContactResponse(BaseModel):
+    id: int
+    contact_id: int
+    username: str  # Имя контакта
+
+    class Config:
+        from_attributes = True
