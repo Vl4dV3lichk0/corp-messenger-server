@@ -2,7 +2,7 @@ from fastapi import WebSocket
 from typing import Dict, List
 import asyncio
 import requests
-import schemas, security
+from app import schemas, security
 
 class ConnectionManager:
     def __init__(self):

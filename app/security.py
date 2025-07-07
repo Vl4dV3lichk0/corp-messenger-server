@@ -7,11 +7,11 @@ from dotenv import load_dotenv, dotenv_values
 
 logger = logging.getLogger(__name__)
 
-ALGORITHM = 'HS256'
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
 load_dotenv()
 SECRET_KEY = os.getenv('SECRET_KEY')
+ALGORITHM = os.getenv('ALGORITHM')
+ACCESS_TOKEN_EXPIRE_MINUTES = os.getenv('ACCESS_TOKEN_EXPIRE_MINUTES')
+
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY не найден в .env")
 
@@ -55,14 +55,3 @@ def decode_token(token: str) -> dict or None:
     except jwt.ExpiredSignatureError:
         logger.error('Срок действия токена JWT истек.')
         return None
-
-if __name__ == '__main__':
-    # Тест
-    '''h = get_password_hash('As2Werd76as!')
-    print(verify_password( 'As2Werd76as!', h))
-
-    data = {'sub': 'Vlad', 'message': 'content'}
-    token = create_access_token(data=data)
-    print(data)
-    print(token)
-    print(decode_token(token))'''
