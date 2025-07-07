@@ -7,7 +7,7 @@ from app import schemas, security
 class ConnectionManager:
     def __init__(self):
         # Основное хранилище: user_id -> список WebSocket-соединений
-        self.active_connections = Dict[str, List[WebSocket]] = {}
+        self.active_connections: Dict[str, List[WebSocket]] = {}
 
         # Для быстрого поиска пользователя по соединению
         self.connection_to_user: Dict[WebSocket, str] = {}
@@ -47,8 +47,14 @@ class ConnectionManager:
         # Уведомляем контакты
         #await self.notify_user_status(user_id, "online")
 
-    async def disconnect(self, websocket: WebSocket, user_id: str):
-        pass
+    async def disconnect(self, websocket: WebSocket):
+        async with self.lock:
+            user_id = self.connection_to_user.get(websocket)
+            if user_id:
+                self.active_connections[user_id].remove(websocket)
+                if not self.active_connections[user_id]:
+                    del self.active_connections[user_id]
+                del self.connection_to_user[websocket]
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         pass

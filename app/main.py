@@ -1,13 +1,18 @@
 import logging
 from email.policy import default
+from idlelib.query import Query
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query, WebSocketDisconnect
 from sqlalchemy.orm import Session
+from starlette.websockets import WebSocket, WebSocketDisconnect
+
 from app import models, schemas, security
 from app.database import SessionLocal
 from datetime import datetime
 from app.schemas import UserCreate, UserLogin, Token, UserResponse
 from fastapi.security import OAuth2PasswordBearer
+
+from app import connection_manager
 
 logger = logging.getLogger(__name__)
 app = FastAPI()
@@ -90,4 +95,30 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
+@app.websocket("/chat")
+async def websocket_endpoint(
+        websocket: WebSocket,
+        token: str = Query(...),
+        db: Session = Depends(get_db)
+):
+    try:
+        payload = security.decode_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            await websocket.close(code=1008)
+            return
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    manager = connection_manager.ConnectionManager()
+    await manager.connect(websocket, user_id)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            # обработка сообщения
+            await websocket.send_text(f"Echo: {data}")
+    except WebSocketDisconnect:
+        await manager.disconnect(websocket)
 
