@@ -50,3 +50,15 @@ class ContactResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class Message(BaseModel):
+    id: int
+    sender_id: int
+    receiver_id: int
+    text: str
+    timestamp: datetime
+    is_delivered: bool
+    is_read: bool
+
+    class Config:
+        from_attributes = True

@@ -144,6 +144,7 @@ async def websocket_endpoint(
     except json.JSONDecodeError:
         await websocket.send_text("Ошибка: Неверный формат сообщения")
 
+# Эндпоинты для обработки контактов
 @app.post("/contacts", response_model=schemas.ContactResponse)
 async def add_contact(
         contact: schemas.ContactCreate,
@@ -180,10 +181,24 @@ async def add_contact(
         "username": db_contact_user.username
     }
 
-
 @app.get("/contacts", response_model=List[schemas.ContactResponse])
 async def get_contacts(
         db: Session = Depends(get_db),
         current_user: models.User = Depends(get_current_user)
 ):
     return crud.get_user_contacts(db, current_user.id)
+
+# main.py
+@app.get("/messages", response_model=List[schemas.Message])
+async def get_messages(
+    contact_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    messages = db.query(models.Message).filter(
+        ((models.Message.sender_id == current_user.id) &
+         (models.Message.receiver_id == contact_id)) |
+        ((models.Message.sender_id == contact_id) &
+         (models.Message.receiver_id == current_user.id))
+    ).order_by(models.Message.timestamp.asc()).all()
+    return messages
