@@ -4,6 +4,8 @@ from fastapi import WebSocket
 from typing import Dict, List, Optional
 from app.crud import get_user_contacts  # Импорт функции
 from sqlalchemy.orm import Session
+from app import models
+import datetime
 
 class ConnectionManager:
     def __init__(self, db: Optional[Session] = None):
@@ -64,7 +66,13 @@ class ConnectionManager:
         )
         await self.notify_status(user_id, "online")
 
-        self.user_status[user_id] = True  # Помечаем как онлайн
+        # Помечаем как онлайн
+        self.user_status[user_id] = True
+        user = self.db.query(models.User).get(int(user_id))
+        if user:
+            user.is_online = True
+            user.last_seen = datetime.datetime.utcnow()
+            self.db.commit()
 
     async def disconnect(self, websocket: WebSocket):
         async with self.lock:
@@ -77,7 +85,14 @@ class ConnectionManager:
                 del self.connection_to_user[websocket]
                 self.user_status[user_id] = False
                 await self.notify_status(user_id, "offline")
-                self.user_status[user_id] = False  # Помечаем как офлайн
+
+                # Помечаем как офлайн
+                self.user_status[user_id] = False
+                user = self.db.query(models.User).get(int(user_id))
+                if user:
+                    user.is_online = True
+                    user.last_seen = datetime.datetime.utcnow()
+                    self.db.commit()
 
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
