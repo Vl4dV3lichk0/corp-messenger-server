@@ -12,6 +12,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_online = Column(Boolean, default=False)
     last_seen = Column(DateTime, default=datetime.datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Обратная связь для контактов
     contacts = relationship(

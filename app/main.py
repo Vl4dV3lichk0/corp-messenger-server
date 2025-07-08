@@ -60,7 +60,8 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
     # Создаем нового пользователя
     new_user = models.User(
         username=user.username,
-        hashed_password=hashed_password)
+        hashed_password=hashed_password,
+        created_at=datetime.utcnow())
 
     # Сохраняем нового пользователя в базе данных
     db.add(new_user)
@@ -69,8 +70,10 @@ async def register(user: UserCreate, db: Session = Depends(get_db)):
 
     # Возвращаем ответ без пароля
     return UserResponse(
+        id=new_user.id,
         username=new_user.username,
-        created_at=datetime.now()
+        created_at=datetime.now(),
+        is_online=new_user.is_online
     )
 
 @app.post("/login", response_model=Token)
@@ -86,7 +89,7 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
 
     # Создаем токен
     try:
-        access_token = security.create_access_token(data={"sub": db_user.username})
+        access_token = security.create_access_token(data={"sub": db_user.username, "user_id": db_user.id})
         # Возвращаем токен
         return Token(
             access_token=access_token,
@@ -96,7 +99,12 @@ async def login(user: UserLogin, db: Session = Depends(get_db)):
 
 @app.get("/users/me", response_model=UserResponse)
 async def read_users_me(current_user: models.User = Depends(get_current_user)):
-    return current_user
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "created_at": current_user.created_at,
+        "is_online": current_user.is_online
+    }
 
 @app.websocket("/chat")
 async def websocket_endpoint(
@@ -106,11 +114,26 @@ async def websocket_endpoint(
 ):
     try:
         payload = security.decode_token(token)
-        user_id = payload.get("sub")
-        if not user_id:
+        if not payload:
             await websocket.close(code=1008)
             return
-    except Exception:
+
+        # Исправляем получение имени пользователя
+        username = payload.get("sub")
+        if not username:
+            await websocket.close(code=1008)
+            return
+
+        # Получаем user_id из базы данных
+        user = db.query(models.User).filter(models.User.username == username).first()
+        if not user:
+            await websocket.close(code=1008)
+            return
+
+        user_id = str(user.id)
+
+    except Exception as e:
+        logger.error(f"Ошибка аутентификации: {str(e)}")
         await websocket.close(code=1008)
         return
 

@@ -34,8 +34,10 @@ class Token(BaseModel):
     token_type: str
 
 class UserResponse(BaseModel):
+    id: int
     username: str
     created_at: datetime
+    is_online: bool
 
     class Config:
         from_attributes = True

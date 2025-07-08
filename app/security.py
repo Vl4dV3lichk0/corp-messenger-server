@@ -42,7 +42,8 @@ def create_access_token(data: dict) -> str:
             "sub": data.get("sub"),
             "user_id": data.get("user_id"),
         }
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire_minutes = int(ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.utcnow() + timedelta(minutes=expire_minutes)
         payload.update({"exp": expire})
         token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
         return token
