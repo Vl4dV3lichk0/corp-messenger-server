@@ -38,7 +38,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(data: dict) -> str:
     """Create an access token"""
     try:
-        payload = {"sub": data.get("sub")}
+        payload = {
+            "sub": data.get("sub"),
+            "user_id": data.get("user_id"),
+        }
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         payload.update({"exp": expire})
         token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
